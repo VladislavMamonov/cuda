@@ -4,8 +4,8 @@
 
 using namespace std;
 
-#define SIZE 8000000
-#define THREADS_PER_BLOCK 64
+int size = 8000000;
+int threads_per_block = 64;
 
 
 __global__ void VecSum(float *A, float *B, float *C)
@@ -17,7 +17,7 @@ __global__ void VecSum(float *A, float *B, float *C)
 
 void printVec(float *C)
 {
-    for (int i = 0; i < SIZE; i++)
+    for (int i = 0; i < size; i++)
         cout << C[i] << "\t";
     cout << endl;
 }
@@ -36,33 +36,36 @@ int main()
 {
     srand(time(NULL));
 
-    float *A = new float[SIZE];
-    float *B = new float[SIZE];
-    float *C = new float[SIZE];
+    float *A = new float[size];
+    float *B = new float[size];
+    float *C = new float[size];
 
     float *dev_A, *dev_B, *dev_C;
 
-    cudaMalloc((void**)&dev_A, SIZE * sizeof(float));
-    cudaMalloc((void**)&dev_B, SIZE * sizeof(float));
-    cudaMalloc((void**)&dev_C, SIZE * sizeof(float));
+    cudaMalloc((void**)&dev_A, size * sizeof(float));
+    cudaMalloc((void**)&dev_B, size * sizeof(float));
+    cudaMalloc((void**)&dev_C, size * sizeof(float));
 
-    for (int i = 0; i < SIZE; i++) {
+    for (int i = 0; i < size; i++) {
         A[i] = rand();
         B[i] = rand();
     }
 
-    cudaMemcpy(dev_A, A, SIZE * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_B, B, SIZE * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_C, C, SIZE * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_A, A, size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_B, B, size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_C, C, size * sizeof(float), cudaMemcpyHostToDevice);
 
-    int blockTotal = SIZE / THREADS_PER_BLOCK;
+    int blockTotal = ceilf(float(size) / float(threads_per_block));
+    cout << "Block total: " << blockTotal << endl;
+    cout << "Threads per block : " << threads_per_block << endl;
+    cout << "Threads total: " << blockTotal * threads_per_block << endl;
 
     double time = wtime();
-    VecSum <<< blockTotal, THREADS_PER_BLOCK >>> (dev_A, dev_B, dev_C);
+    VecSum <<< blockTotal, threads_per_block >>> (dev_A, dev_B, dev_C);
     cudaDeviceSynchronize();
     time = wtime() - time;
 
-    cudaMemcpy(C, dev_C, SIZE * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(C, dev_C, size * sizeof(float), cudaMemcpyDeviceToHost);
 
     cout << "time: " << time << endl;
     //printVec(C);
