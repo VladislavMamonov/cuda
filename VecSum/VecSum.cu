@@ -85,6 +85,7 @@ int main(int argc, char* argv[])
     //printVec(C, size);
 
     delete [] A; delete [] B; delete [] C;
+    cudaEventDestroy(start); cudaEventDestroy(stop); 
     cudaFree(dev_A); cudaFree(dev_B); cudaFree(dev_C);
 
     return 0;
