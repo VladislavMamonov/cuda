@@ -96,18 +96,26 @@ int main(int argc, char* argv[])
     cudaMemcpy(dev_B, B, size * size * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(dev_C, C, size * size * sizeof(float), cudaMemcpyHostToDevice);
 
-    double time = wtime();
+    float elapsedTime;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start, 0);
     dgemm <<< blocks, threads >>> (dev_A, dev_B, dev_C, threads_per_block, size);
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
     CUDA_CHECK_RETURN(cudaGetLastError());
-    time = wtime() - time;
+    cudaEventElapsedTime(&elapsedTime, start, stop);
 
     cudaMemcpy(C, dev_C, size * size * sizeof(float), cudaMemcpyDeviceToHost);
 
-    cout << "time: " << time << endl;
+    cout << "time: " << elapsedTime << " ms" << endl;
     //printMatrix(C, size);
 
     delete [] A; delete [] B; delete [] C;
+    cudaEventDestroy(start); cudaEventDestroy(stop);
     cudaFree(dev_A); cudaFree(dev_B); cudaFree(dev_C);
 
     return 0;

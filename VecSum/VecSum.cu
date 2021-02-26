@@ -75,17 +75,18 @@ int main(int argc, char* argv[])
     cudaEventRecord(start, 0);
     VecSum <<< blockTotal, threads_per_block >>> (dev_A, dev_B, dev_C, size);
     cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
     CUDA_CHECK_RETURN(cudaGetLastError());
     cudaEventElapsedTime(&elapsedTime, start, stop);
 
     cudaMemcpy(C, dev_C, size * sizeof(float), cudaMemcpyDeviceToHost);
 
-    cout << "time: " << elapsedTime << endl;
+    cout << "time: " << elapsedTime << " ms" << endl;
     //printVec(C, size);
 
     delete [] A; delete [] B; delete [] C;
-    cudaEventDestroy(start); cudaEventDestroy(stop); 
+    cudaEventDestroy(start); cudaEventDestroy(stop);
     cudaFree(dev_A); cudaFree(dev_B); cudaFree(dev_C);
 
     return 0;
