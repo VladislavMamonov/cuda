@@ -117,6 +117,6 @@ int main(int argc, char* argv[])
     delete [] A; delete [] B; delete [] C;
     cudaEventDestroy(start); cudaEventDestroy(stop);
     cudaFree(dev_A); cudaFree(dev_B); cudaFree(dev_C);
-
+    
     return 0;
 }
