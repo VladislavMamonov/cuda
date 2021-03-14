@@ -6,9 +6,6 @@
 using namespace std;
 
 
-int threads_per_block = 8;
-
-
 #define CUDA_CHECK_RETURN(value) {\
     cudaError_t _m_cudaStat = value;\
     if (_m_cudaStat != cudaSuccess) {\
@@ -49,7 +46,7 @@ void InitMatrix(float *A, float *B, float *C, int size)
 
 void printMatrix(float *C, int size)
 {
-    for (int i = 0; i < size; i++)
+    for (int i = 0; i < size * size; i++)
         cout << C[i] << "\t";
     cout << endl;
 }
@@ -102,7 +99,7 @@ int main(int argc, char* argv[])
     cudaEventCreate(&stop);
 
     cudaEventRecord(start, 0);
-    dgemm <<< blocks, threads >>> (dev_A, dev_B, dev_C, threads_per_block, size);
+    dgemm <<< blocks, threads >>> (dev_A, dev_B, dev_C, threads_per_block_x, size);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
@@ -112,11 +109,11 @@ int main(int argc, char* argv[])
     cudaMemcpy(C, dev_C, size * size * sizeof(float), cudaMemcpyDeviceToHost);
 
     cout << "time: " << elapsedTime << " ms" << endl;
-    //printMatrix(C, size);
+    printMatrix(C, size);
 
     delete [] A; delete [] B; delete [] C;
     cudaEventDestroy(start); cudaEventDestroy(stop);
     cudaFree(dev_A); cudaFree(dev_B); cudaFree(dev_C);
-    
+
     return 0;
 }
