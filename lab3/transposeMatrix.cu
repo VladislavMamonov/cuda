@@ -14,7 +14,7 @@ using namespace std;
     }}
 
 
-__global__ void InitMatrix(float *A, int threads_per_block_x, int blocks_X, int n)
+__global__ void transpose(float *A, float *B, int n)
 {
     int bx = blockIdx.x;
     int by = blockIdx.y;
@@ -24,11 +24,18 @@ __global__ void InitMatrix(float *A, int threads_per_block_x, int blocks_X, int 
     int i = tx + bx * blockDim.x;
     int j = ty + by * blockDim.y;
 
-    // str init
-    A[i * n + j] = i * n + j;
+    B[j * n + i] = A[i * n + j];
+}
 
-    // col init
-    // A[j * n + i] =  j * n + i;
+
+void InitMatrix(float *A, float *B, int size)
+{
+    for (int i = 0; i < size; i++)
+        for (int j = 0; j < size; j++) {
+            int k = size * i + j;
+            A[k] = k;
+            B[k] = 0;
+        }
 }
 
 
@@ -63,15 +70,20 @@ int main(int argc, char* argv[])
     srand(time(NULL));
 
     float *A = new float[size * size];
+    float *B = new float[size * size];
 
-    float *dev_A;
+    float *dev_A, *dev_B;
+
     cudaMalloc((void**)&dev_A, size * size * sizeof(float));
+    cudaMalloc((void**)&dev_B, size * size * sizeof(float));
+
+    InitMatrix(A, B, size);
 
     dim3 threads(threads_per_block_x, threads_per_block_y);
     dim3 blocks(size / threads.x, size / threads.y);
-    int blocks_X = size / threads.x;
 
     cudaMemcpy(dev_A, A, size * size * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_B, B, size * size * sizeof(float), cudaMemcpyHostToDevice);
 
     float elapsedTime;
     cudaEvent_t start, stop;
@@ -79,21 +91,21 @@ int main(int argc, char* argv[])
     cudaEventCreate(&stop);
 
     cudaEventRecord(start, 0);
-    InitMatrix <<< blocks, threads >>> (dev_A, threads_per_block_x, blocks_X, size);
+    transpose <<< blocks, threads >>> (dev_A, dev_B, size);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     CUDA_CHECK_RETURN(cudaDeviceSynchronize());
     CUDA_CHECK_RETURN(cudaGetLastError());
     cudaEventElapsedTime(&elapsedTime, start, stop);
 
-    cudaMemcpy(A, dev_A, size * size * sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpy(B, dev_B, size * size * sizeof(float), cudaMemcpyDeviceToHost);
 
-    // printMatrix(A, size);
+    printMatrix(B, size);
     cout << "time: " << elapsedTime << " ms" << endl;
 
-    delete [] A;
+    delete [] A; delete [] B;
     cudaEventDestroy(start); cudaEventDestroy(stop);
-    cudaFree(dev_A);
+    cudaFree(dev_A); cudaFree(dev_B);
 
     return 0;
 }
