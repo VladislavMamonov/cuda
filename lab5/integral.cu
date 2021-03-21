@@ -20,7 +20,7 @@ struct Vertex {
     float x, y, z;
 };
 
-__constant__ Vertex vert[VERTCOUNT];
+__device__ Vertex vert[VERTCOUNT];
 
 
 float func(float x, float y, float z)
