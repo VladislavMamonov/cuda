@@ -24,12 +24,47 @@ __global__ void VecSum(float *A, float *B, float *C, int size)
 
 
 
-__global__ void VecMul(float *A, float *B, float *C, int size)
+__global__ void VecMul(float *A, float *B, float *C, int partSize)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    __shared__ float cache[256];
 
-    if (i < size)
-        C[i] = A[i] * B[i];
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int cacheIndex = threadIdx.x;
+    int temp = 0;
+
+    while (tid < partSize) {
+        temp += A[tid] * B[tid];
+        tid += blockDim.x * gridDim.x;
+    }
+
+    cache[cacheIndex] = temp;
+
+    __syncthreads();
+
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (cacheIndex < s) {
+            cache[cacheIndex] += cache[cacheIndex + s];
+        }
+        __syncthreads();
+    }
+
+    if (cacheIndex == 0) C[blockIdx.x] = cache[0];
+}
+
+
+void InitVec(float *A, float *B, int size)
+{
+    for (int i = 0; i < size; i++) {
+        A[i] = 1;
+        B[i] = 1;
+    }
+}
+
+
+void printVec(float *vec, int size)
+{
+    for (int i = 0; i < size; i++)
+        cout << vec[i] << endl;
 }
 
 
@@ -59,14 +94,18 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    float *A = new float[full_data_size];
-    float *B = new float[full_data_size];
-    float *C = new float[full_data_size];
-
     float *dev_a, *dev_b, *dev_c;
-    cudaHostAlloc((void**)&dev_a, full_data_size * sizeof(int), cudaHostAllocDefault);
-    cudaHostAlloc((void**)&dev_b, full_data_size * sizeof(int), cudaHostAllocDefault);
-    cudaHostAlloc((void**)&dev_c, full_data_size * sizeof(int), cudaHostAllocDefault);
+    float *A, *B, *C;
+
+    cudaHostAlloc((void**)&A, full_data_size * sizeof(float), cudaHostAllocDefault);
+    cudaHostAlloc((void**)&B, full_data_size * sizeof(float), cudaHostAllocDefault);
+    cudaHostAlloc((void**)&C, full_data_size * sizeof(float), cudaHostAllocDefault);
+
+    InitVec(A, B, full_data_size);
+
+    cudaMalloc((void**)&dev_a, full_data_size * sizeof(float));
+    cudaMalloc((void**)&dev_b, full_data_size * sizeof(float));
+    cudaMalloc((void**)&dev_c, full_data_size * sizeof(float));
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
@@ -78,12 +117,15 @@ int main(int argc, char* argv[])
 
     cudaEventRecord(start, 0);
     for (int i = 0; i < full_data_size; i += partSize) {
-        cudaMemcpyAsync(dev_a, A + i, partSize * sizeof(int), cudaMemcpyHostToDevice, stream);
-        cudaMemcpyAsync(dev_b, B + i, partSize * sizeof(int), cudaMemcpyHostToDevice, stream);
-        cudaMemcpyAsync(dev_c, C + i, partSize * sizeof(int), cudaMemcpyHostToDevice, stream);
-        VecMul <<< partSize / 256, 256, 0, stream >>> (dev_a, dev_b, dev_c, full_data_size);
-        cudaMemcpyAsync(C + i, dev_c, partSize * sizeof(int), cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(dev_a, A + i, partSize * sizeof(float), cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(dev_b, B + i, partSize * sizeof(float), cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(dev_c, C + i, partSize * sizeof(float), cudaMemcpyHostToDevice, stream);
+        VecSum <<< partSize / 256, 256, 0, stream >>> (dev_a, dev_b, dev_c, full_data_size);
+        cudaMemcpyAsync(C + i, dev_c, partSize * sizeof(float), cudaMemcpyDeviceToHost, stream);
     }
+
+    //printVec(C, full_data_size);
+
     cudaStreamSynchronize(stream);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
